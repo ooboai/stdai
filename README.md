@@ -30,26 +30,31 @@ stdai fills that gap with a simple model:
 
 ## Install
 
+### One-liner
+
+```bash
+curl -sSf https://raw.githubusercontent.com/ooboai/stdai/main/install.sh | bash
+```
+
 ### From source
+
+```bash
+cargo install --git https://github.com/ooboai/stdai.git --locked
+```
+
+### From a local checkout
 
 ```bash
 cargo install --path .
 ```
 
-### From crates.io (coming soon)
-
-```bash
-cargo install stdai
-```
+No setup required. The workspace (`.stdai/`) auto-initializes on first use at
+your git repo root (or current directory if outside a repo).
 
 ## Quick Start
 
 ```bash
-# Initialize a workspace
-cd my-project
-stdai init
-
-# Write a note
+# Just start using it — no init needed
 stdai write --kind note --content "guest sessions break when middleware assumes user role"
 
 # Pipe content through (output flows to next command unchanged)
@@ -69,8 +74,9 @@ stdai upstream 01HXYZ... --recursive
 
 ### `stdai init`
 
-Initialize a workspace in the current directory. Creates `.stdai/` with object
-store, SQLite database, and config file.
+Explicitly initialize a workspace in the current directory. This is **optional**
+— all commands auto-initialize on first use. Useful if you want to control
+exactly where the `.stdai/` directory is created.
 
 ```bash
 stdai init

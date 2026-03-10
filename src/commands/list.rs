@@ -9,7 +9,7 @@ pub struct ListArgs {
 }
 
 pub fn run(args: &ListArgs) -> Result<()> {
-    let ws = Workspace::find()?;
+    let ws = Workspace::find_or_init()?;
     let conn = db::open(&ws.db_path())?;
 
     let artifacts = db::list_artifacts(

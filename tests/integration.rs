@@ -126,14 +126,22 @@ fn write_empty_content_fails() {
 }
 
 #[test]
-fn write_fails_without_init() {
+fn write_auto_initializes_workspace() {
     let dir = tempfile::tempdir().unwrap();
-    stdai()
+    assert!(!dir.path().join(".stdai").exists());
+
+    let output = stdai()
         .args(["write", "--kind", "note", "--content", "hello"])
         .current_dir(dir.path())
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not initialized"));
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "write should auto-init");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("auto-initialized"), "stderr: {}", stderr);
+    assert!(dir.path().join(".stdai").is_dir());
+    assert!(dir.path().join(".stdai/objects").is_dir());
+    assert!(dir.path().join(".stdai/stdai.db").exists());
 }
 
 // ─── write (pipe mode) ─────────────────────────────────────────────────────

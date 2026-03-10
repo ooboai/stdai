@@ -9,7 +9,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- `stdai init` — initialize a workspace with content-addressed object store and SQLite metadata database
+- Auto-initialization: workspace is created transparently on first use (at git repo root or cwd)
+- `install.sh` one-liner installer
+- `stdai init` — explicitly initialize a workspace (optional, all commands auto-init)
 - `stdai write` — store artifacts from `--content` or stdin pipe with automatic metadata capture
 - `stdai find` — full-text search across artifacts with kind, tag, and task filters
 - `stdai show` — display full artifact detail, JSON output, or raw content

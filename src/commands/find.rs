@@ -17,7 +17,7 @@ pub fn run(args: &FindArgs) -> Result<()> {
         ));
     }
 
-    let ws = Workspace::find()?;
+    let ws = Workspace::find_or_init()?;
     let conn = db::open(&ws.db_path())?;
 
     let artifacts = if let Some(ref q) = args.query {
