@@ -2,6 +2,7 @@ use std::io::{IsTerminal, Read, Write};
 
 use crate::artifact::Artifact;
 use crate::error::{Error, Result};
+use crate::identity;
 use crate::metadata::Metadata;
 use crate::storage::{db, objects, Workspace};
 
@@ -16,6 +17,7 @@ pub struct WriteArgs {
     pub format: Option<String>,
     pub json: bool,
     pub no_forward: bool,
+    pub identity: Option<String>,
 }
 
 pub fn run(args: &WriteArgs) -> Result<()> {
@@ -27,6 +29,9 @@ pub fn run(args: &WriteArgs) -> Result<()> {
 
     let ws = Workspace::open()?;
     let conn = db::open(&ws.db_path())?;
+
+    let resolved = identity::resolve_identity(args.identity.as_deref(), ws.root())?;
+    let signing_key = identity::keys::load_signing_key(&ws.identities_dir(), &resolved.address)?;
 
     for parent_id in &args.based_on {
         db::get_artifact(&conn, parent_id).map_err(|_| {
@@ -40,7 +45,7 @@ pub fn run(args: &WriteArgs) -> Result<()> {
     let preview = Artifact::make_preview(&content);
     let content_format = Artifact::detect_format(&content, args.format.as_deref());
 
-    let artifact = Artifact {
+    let mut artifact = Artifact {
         id: id.clone(),
         content_hash: hash,
         object_path,
@@ -61,9 +66,22 @@ pub fn run(args: &WriteArgs) -> Result<()> {
         source_mode: source_mode.clone(),
         preview,
         project: meta.project,
+        signature: None,
+        signer_address: None,
+        signer_pubkey: None,
         tags: args.tags.clone(),
         based_on: args.based_on.clone(),
     };
+
+    let payload = identity::signing::build_signing_payload(
+        &artifact.content_hash,
+        artifact.kind.as_deref(),
+        &artifact.created_at,
+        artifact.agent_id.as_deref(),
+    );
+    artifact.signature = Some(identity::signing::sign(&signing_key, &payload));
+    artifact.signer_address = Some(resolved.address.clone());
+    artifact.signer_pubkey = Some(hex::encode(signing_key.verifying_key().as_bytes()));
 
     db::insert_artifact(&conn, &artifact)?;
 

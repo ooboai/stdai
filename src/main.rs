@@ -2,6 +2,7 @@ mod artifact;
 mod cli;
 mod commands;
 mod error;
+mod identity;
 mod metadata;
 mod storage;
 
@@ -24,6 +25,7 @@ fn main() {
             format,
             json,
             no_forward,
+            identity,
         } => commands::write::run(&commands::write::WriteArgs {
             kind,
             content,
@@ -35,6 +37,7 @@ fn main() {
             format,
             json,
             no_forward,
+            identity,
         }),
         Commands::Find {
             query,
@@ -103,6 +106,10 @@ fn main() {
         }
         Commands::Context { json } => {
             commands::context::run(&commands::context::ContextArgs { json })
+        }
+        Commands::Identity(sub) => commands::identity::run(sub),
+        Commands::Verify { id, json } => {
+            commands::verify::run(&commands::verify::VerifyArgs { id, json })
         }
     };
 

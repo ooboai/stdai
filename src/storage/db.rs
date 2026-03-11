@@ -40,7 +40,10 @@ CREATE TABLE IF NOT EXISTS artifacts (
     hostname        TEXT,
     source_mode     TEXT NOT NULL,
     preview         TEXT,
-    project         TEXT
+    project         TEXT,
+    signature       TEXT,
+    signer_address  TEXT,
+    signer_pubkey   TEXT
 );
 
 CREATE TABLE IF NOT EXISTS artifact_links (
@@ -68,6 +71,7 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_kind ON artifacts(kind);
 CREATE INDEX IF NOT EXISTS idx_artifacts_created ON artifacts(created_at);
 CREATE INDEX IF NOT EXISTS idx_artifacts_task ON artifacts(task_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_project ON artifacts(project);
+CREATE INDEX IF NOT EXISTS idx_artifacts_signer ON artifacts(signer_address);
 CREATE INDEX IF NOT EXISTS idx_links_parent ON artifact_links(parent_id);
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON artifact_tags(tag);
 ";
@@ -96,6 +100,15 @@ fn ensure_schema(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    if !columns.contains(&"signature".to_string()) {
+        conn.execute_batch(
+            "ALTER TABLE artifacts ADD COLUMN signature TEXT;
+             ALTER TABLE artifacts ADD COLUMN signer_address TEXT;
+             ALTER TABLE artifacts ADD COLUMN signer_pubkey TEXT;
+             CREATE INDEX IF NOT EXISTS idx_artifacts_signer ON artifacts(signer_address);",
+        )?;
+    }
+
     Ok(())
 }
 
@@ -107,8 +120,9 @@ pub fn insert_artifact(conn: &Connection, artifact: &Artifact) -> Result<()> {
          (id, content_hash, object_path, kind, name, content_format,
           created_at, size_bytes, session_id, agent_id, task_id,
           cwd, repo_root, repo_name, git_branch, git_commit,
-          hostname, source_mode, preview, project)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+          hostname, source_mode, preview, project,
+          signature, signer_address, signer_pubkey)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
         params![
             artifact.id,
             artifact.content_hash,
@@ -130,6 +144,9 @@ pub fn insert_artifact(conn: &Connection, artifact: &Artifact) -> Result<()> {
             artifact.source_mode,
             artifact.preview,
             artifact.project,
+            artifact.signature,
+            artifact.signer_address,
+            artifact.signer_pubkey,
         ],
     )?;
     Ok(())
@@ -492,6 +509,9 @@ fn row_to_artifact(row: &rusqlite::Row) -> rusqlite::Result<Artifact> {
         source_mode: row.get("source_mode")?,
         preview: row.get("preview")?,
         project: row.get("project")?,
+        signature: row.get("signature")?,
+        signer_address: row.get("signer_address")?,
+        signer_pubkey: row.get("signer_pubkey")?,
         tags: Vec::new(),
         based_on: Vec::new(),
     })

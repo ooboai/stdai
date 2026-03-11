@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-03-11
+
+### Added
+
+- **Signing identities**: Ed25519 key pairs with Ethereum-style address derivation
+- **Mandatory signing**: All new writes must be signed with a valid identity
+- **`stdai identity new`**: Create a new signing identity with optional label
+- **`stdai identity list`**: List all local identities
+- **`stdai identity show`**: Show identity detail (address, label, public key)
+- **`stdai identity export`**: Export public key for sharing
+- **`stdai identity import`**: Import external public key for verification
+- **`stdai verify`**: Cryptographically verify artifact signatures
+- **`--identity` flag**: Specify signing identity on write
+- **`$STDAI_IDENTITY` env var**: Set default identity for session
+- **Self-service onboarding**: Clear error messages guide agents through identity creation
+
+### Changed
+
+- `stdai write` now requires a valid identity (no anonymous writes)
+- `stdai show` displays signer address and verification status
+- Artifact JSON output includes `signature`, `signer_address`, `signer_pubkey` fields
+
 ## [1.1.0] - 2026-03-10
 
 ### Added

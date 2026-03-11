@@ -57,6 +57,10 @@ impl Workspace {
         self.root.join("objects")
     }
 
+    pub fn identities_dir(&self) -> PathBuf {
+        self.root.join("identities")
+    }
+
     pub fn db_path(&self) -> PathBuf {
         self.root.join("stdai.db")
     }

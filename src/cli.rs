@@ -61,6 +61,10 @@ pub enum Commands {
         /// Capture only — do not forward stdin to stdout
         #[arg(long = "no-forward")]
         no_forward: bool,
+
+        /// Identity address to sign with (or set $STDAI_IDENTITY)
+        #[arg(long)]
+        identity: Option<String>,
     },
 
     /// Search artifacts by text query and/or filters
@@ -181,5 +185,52 @@ pub enum Commands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+    },
+
+    /// Manage signing identities
+    #[command(subcommand)]
+    Identity(IdentityCommands),
+
+    /// Verify an artifact's signature
+    Verify {
+        /// Artifact ID
+        id: String,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum IdentityCommands {
+    /// Create a new signing identity
+    New {
+        /// Human-readable label for this identity
+        #[arg(long)]
+        label: Option<String>,
+    },
+    /// List all local identities
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show identity detail
+    Show {
+        /// Identity address (prefix match supported)
+        address: String,
+    },
+    /// Export public key for sharing
+    Export {
+        /// Identity address
+        address: String,
+    },
+    /// Import an external public key (verification-only)
+    Import {
+        /// Hex-encoded public key
+        #[arg(long)]
+        pubkey: String,
+        /// Optional label
+        #[arg(long)]
+        label: Option<String>,
     },
 }

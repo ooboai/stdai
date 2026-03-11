@@ -1,6 +1,6 @@
 [package]
 name = "stdai"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 description = "A CLI primitive for retained agent work"
 license = "Apache-2.0"
@@ -19,6 +19,9 @@ serde_json = "1"
 chrono = "0.4"
 thiserror = "2"
 hex = "0.4"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"
+toml = "0.8"
 
 [dev-dependencies]
 assert_cmd = "2"

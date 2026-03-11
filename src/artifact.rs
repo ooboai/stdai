@@ -35,6 +35,12 @@ pub struct Artifact {
     pub preview: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signer_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signer_pubkey: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -155,6 +161,14 @@ impl Artifact {
         }
         if let Some(ref h) = self.hostname {
             out.push_str(&format!("Host      {}\n", h));
+        }
+        if let Some(ref addr) = self.signer_address {
+            out.push_str(&format!("Signer    {}\n", addr));
+        }
+        if self.signature.is_some() {
+            out.push_str("Signed    yes\n");
+        } else {
+            out.push_str("Signed    no (legacy/unsigned)\n");
         }
         out.push_str(&format!("Source    {}\n", self.source_mode));
         if let Some(text) = content {
