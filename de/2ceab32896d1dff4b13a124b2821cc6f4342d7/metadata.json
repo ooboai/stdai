@@ -1,0 +1,203 @@
+{
+  "oobo_version": "0.1.0",
+  "commit_hash": "de2ceab32896d1dff4b13a124b2821cc6f4342d7",
+  "branch": "main",
+  "author": "Teddy <teodosp@gmail.com>",
+  "author_type": "agent",
+  "contributors": [
+    {
+      "name": "Teddy <teodosp@gmail.com>",
+      "role": "human"
+    },
+    {
+      "name": "cursor",
+      "role": "agent",
+      "model": "claude-4.6-opus-high-thinking"
+    }
+  ],
+  "committed_at": 1773207599,
+  "message": "feat: add mandatory Ed25519 artifact signing with identity management (v1.2)",
+  "files_changed": [
+    "CHANGELOG.md",
+    "Cargo.lock",
+    "Cargo.toml",
+    "README.md",
+    "skills/core/SKILL.md",
+    "src/artifact.rs",
+    "src/cli.rs",
+    "src/commands/identity.rs",
+    "src/commands/mod.rs",
+    "src/commands/verify.rs",
+    "src/commands/write.rs",
+    "src/error.rs",
+    "src/identity/address.rs",
+    "src/identity/keys.rs",
+    "src/identity/mod.rs",
+    "src/identity/signing.rs",
+    "src/main.rs",
+    "src/storage/db.rs",
+    "src/storage/mod.rs",
+    "tests/common/mod.rs",
+    "tests/integration.rs"
+  ],
+  "added": 1518,
+  "deleted": 216,
+  "file_changes": [
+    {
+      "path": "CHANGELOG.md",
+      "added": 22,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "Cargo.lock",
+      "added": 244,
+      "deleted": 5,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "Cargo.toml",
+      "added": 4,
+      "deleted": 1,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "README.md",
+      "added": 104,
+      "deleted": 14,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "skills/core/SKILL.md",
+      "added": 53,
+      "deleted": 2,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/artifact.rs",
+      "added": 14,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/cli.rs",
+      "added": 51,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/commands/identity.rs",
+      "added": 73,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/commands/mod.rs",
+      "added": 2,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/commands/verify.rs",
+      "added": 85,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/commands/write.rs",
+      "added": 19,
+      "deleted": 1,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/error.rs",
+      "added": 9,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/identity/address.rs",
+      "added": 11,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/identity/keys.rs",
+      "added": 203,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/identity/mod.rs",
+      "added": 39,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/identity/signing.rs",
+      "added": 51,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/main.rs",
+      "added": 7,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/storage/db.rs",
+      "added": 23,
+      "deleted": 3,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/storage/mod.rs",
+      "added": 4,
+      "deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "tests/common/mod.rs",
+      "added": 65,
+      "deleted": 11,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "tests/integration.rs",
+      "added": 435,
+      "deleted": 179,
+      "attribution": "ai",
+      "agent": "cursor"
+    }
+  ],
+  "ai_added": 1518,
+  "ai_deleted": 216,
+  "human_added": 0,
+  "human_deleted": 0,
+  "ai_percentage": 100.0,
+  "session_ids": [
+    "9d38e91d-4018-4364-baae-bc94b2658c10"
+  ],
+  "transparency_mode": "on"
+}

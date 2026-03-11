@@ -1,0 +1,29 @@
+{
+  "session_id": "9d38e91d-4018-4364-baae-bc94b2658c10",
+  "agent": "cursor",
+  "model": "claude-4.6-opus-high-thinking",
+  "link_type": "explicit",
+  "files_touched": [
+    "Cargo.toml",
+    "src/identity/address.rs",
+    "src/identity/signing.rs",
+    "src/identity/keys.rs",
+    "src/identity/mod.rs",
+    "src/error.rs",
+    "src/artifact.rs",
+    "src/storage/db.rs",
+    "src/storage/mod.rs",
+    "src/commands/identity.rs",
+    "src/commands/verify.rs",
+    "src/commands/write.rs",
+    "src/cli.rs",
+    "src/main.rs",
+    "src/commands/mod.rs",
+    "tests/common/mod.rs",
+    "tests/integration.rs",
+    "CHANGELOG.md",
+    "README.md",
+    "skills/core/SKILL.md"
+  ],
+  "is_subagent": false
+}
