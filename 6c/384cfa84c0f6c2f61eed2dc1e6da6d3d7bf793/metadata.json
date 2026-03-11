@@ -1,0 +1,217 @@
+{
+  "oobo_version": "0.1.0",
+  "commit_hash": "6c384cfa84c0f6c2f61eed2dc1e6da6d3d7bf793",
+  "branch": "main",
+  "author": "Teddy <teodosp@gmail.com>",
+  "author_type": "agent",
+  "contributors": [
+    {
+      "name": "Teddy <teodosp@gmail.com>",
+      "role": "human"
+    }
+  ],
+  "committed_at": 1773189044,
+  "message": "feat: migrate to global storage with project-scoped views (v1.1)",
+  "files_changed": [
+    ".gitignore",
+    "CHANGELOG.md",
+    "Cargo.lock",
+    "Cargo.toml",
+    "README.md",
+    "skills/core/SKILL.md",
+    "src/artifact.rs",
+    "src/cli.rs",
+    "src/commands/context.rs",
+    "src/commands/doctor.rs",
+    "src/commands/downstream.rs",
+    "src/commands/find.rs",
+    "src/commands/init.rs",
+    "src/commands/list.rs",
+    "src/commands/mod.rs",
+    "src/commands/projects.rs",
+    "src/commands/show.rs",
+    "src/commands/upstream.rs",
+    "src/commands/write.rs",
+    "src/error.rs",
+    "src/main.rs",
+    "src/metadata.rs",
+    "src/storage/db.rs",
+    "src/storage/migration.rs",
+    "src/storage/mod.rs",
+    "tests/common/mod.rs",
+    "tests/integration.rs"
+  ],
+  "lines_added": 1391,
+  "lines_deleted": 531,
+  "file_changes": [
+    {
+      "path": ".gitignore",
+      "lines_added": 2,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "lines_added": 27,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "Cargo.lock",
+      "lines_added": 1,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "Cargo.toml",
+      "lines_added": 1,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "README.md",
+      "lines_added": 89,
+      "lines_deleted": 33,
+      "attribution": "human"
+    },
+    {
+      "path": "skills/core/SKILL.md",
+      "lines_added": 146,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "src/artifact.rs",
+      "lines_added": 5,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "src/cli.rs",
+      "lines_added": 33,
+      "lines_deleted": 2,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/context.rs",
+      "lines_added": 50,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/doctor.rs",
+      "lines_added": 29,
+      "lines_deleted": 10,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/downstream.rs",
+      "lines_added": 1,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/find.rs",
+      "lines_added": 25,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/init.rs",
+      "lines_added": 6,
+      "lines_deleted": 6,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/list.rs",
+      "lines_added": 20,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/mod.rs",
+      "lines_added": 2,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/projects.rs",
+      "lines_added": 42,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/show.rs",
+      "lines_added": 1,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/upstream.rs",
+      "lines_added": 1,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "src/commands/write.rs",
+      "lines_added": 2,
+      "lines_deleted": 1,
+      "attribution": "human"
+    },
+    {
+      "path": "src/error.rs",
+      "lines_added": 0,
+      "lines_deleted": 6,
+      "attribution": "human"
+    },
+    {
+      "path": "src/main.rs",
+      "lines_added": 15,
+      "lines_deleted": 4,
+      "attribution": "human"
+    },
+    {
+      "path": "src/metadata.rs",
+      "lines_added": 29,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "src/storage/db.rs",
+      "lines_added": 182,
+      "lines_deleted": 161,
+      "attribution": "human"
+    },
+    {
+      "path": "src/storage/migration.rs",
+      "lines_added": 128,
+      "lines_deleted": 0,
+      "attribution": "human"
+    },
+    {
+      "path": "src/storage/mod.rs",
+      "lines_added": 49,
+      "lines_deleted": 57,
+      "attribution": "human"
+    },
+    {
+      "path": "tests/common/mod.rs",
+      "lines_added": 47,
+      "lines_deleted": 19,
+      "attribution": "human"
+    },
+    {
+      "path": "tests/integration.rs",
+      "lines_added": 458,
+      "lines_deleted": 225,
+      "attribution": "human"
+    }
+  ],
+  "ai_lines_added": 0,
+  "ai_lines_deleted": 0,
+  "human_lines_added": 1391,
+  "human_lines_deleted": 531,
+  "ai_percentage": 0.0,
+  "session_ids": [],
+  "transparency_mode": "off"
+}
