@@ -9,6 +9,7 @@ pub struct Metadata {
     pub repo_name: Option<String>,
     pub git_branch: Option<String>,
     pub git_commit: Option<String>,
+    pub project: Option<String>,
 }
 
 impl Metadata {
@@ -19,6 +20,7 @@ impl Metadata {
         let hostname = run_cmd("hostname", &[]);
         let session_id = ulid::Ulid::new().to_string();
         let git = GitInfo::capture();
+        let project = detect_project_with_git(&git);
 
         Metadata {
             cwd,
@@ -28,8 +30,35 @@ impl Metadata {
             repo_name: git.name,
             git_branch: git.branch,
             git_commit: git.commit,
+            project,
         }
     }
+}
+
+/// Detect current project name.
+/// Resolution: $STDAI_PROJECT > git repo basename > cwd basename
+pub fn detect_project() -> Option<String> {
+    let git = GitInfo::capture();
+    detect_project_with_git(&git)
+}
+
+fn detect_project_with_git(git: &GitInfo) -> Option<String> {
+    std::env::var("STDAI_PROJECT")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| git.name.clone())
+        .or_else(|| {
+            std::env::current_dir()
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+        })
+}
+
+/// Detect the project root directory (git root or cwd).
+pub fn project_root() -> Option<PathBuf> {
+    git_cmd(&["rev-parse", "--show-toplevel"])
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_dir().ok())
 }
 
 struct GitInfo {

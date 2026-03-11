@@ -8,6 +8,8 @@ pub struct FindArgs {
     pub task: Option<String>,
     pub limit: u32,
     pub json: bool,
+    pub all: bool,
+    pub project: Option<String>,
 }
 
 pub fn run(args: &FindArgs) -> Result<()> {
@@ -17,8 +19,10 @@ pub fn run(args: &FindArgs) -> Result<()> {
         ));
     }
 
-    let ws = Workspace::find_or_init()?;
+    let ws = Workspace::open()?;
     let conn = db::open(&ws.db_path())?;
+
+    let project_filter = resolve_project_filter(args.all, args.project.as_deref(), ws.project());
 
     let artifacts = if let Some(ref q) = args.query {
         db::find_artifacts(
@@ -27,6 +31,7 @@ pub fn run(args: &FindArgs) -> Result<()> {
             args.kind.as_deref(),
             args.tag.as_deref(),
             args.task.as_deref(),
+            project_filter.as_deref(),
             args.limit,
         )?
     } else {
@@ -35,6 +40,7 @@ pub fn run(args: &FindArgs) -> Result<()> {
             args.kind.as_deref(),
             args.tag.as_deref(),
             args.task.as_deref(),
+            project_filter.as_deref(),
             args.limit,
         )?
     };
@@ -50,4 +56,22 @@ pub fn run(args: &FindArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Determine the effective project filter:
+/// - `--all` → None (no filter)
+/// - `--project X` → Some("X")
+/// - otherwise → auto-detected project
+fn resolve_project_filter(
+    all: bool,
+    explicit_project: Option<&str>,
+    detected_project: Option<&str>,
+) -> Option<String> {
+    if all {
+        None
+    } else if let Some(p) = explicit_project {
+        Some(p.to_string())
+    } else {
+        detected_project.map(|p| p.to_string())
+    }
 }

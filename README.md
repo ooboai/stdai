@@ -27,6 +27,7 @@ stdai fills that gap with a simple model:
 - Artifacts link to upstream work via **`based_on`** lineage, forming a provenance DAG
 - Everything is **searchable** via full-text search
 - Pipe semantics are preserved — stdout carries the original payload unchanged
+- All artifacts live in a **single global store** scoped by project context
 
 ## Install
 
@@ -48,8 +49,7 @@ cargo install --git https://github.com/ooboai/stdai.git --locked
 cargo install --path .
 ```
 
-No setup required. The workspace (`.stdai/`) auto-initializes on first use at
-your git repo root (or current directory if outside a repo).
+No setup required. The global store (`~/.stdai/`) auto-creates on first use.
 
 ## Quick Start
 
@@ -60,27 +60,54 @@ stdai write --kind note --content "guest sessions break when middleware assumes 
 # Pipe content through (output flows to next command unchanged)
 echo "research output" | stdai write --kind research | next-step.sh
 
-# Search for artifacts
+# Search for artifacts (current project by default)
 stdai find "guest session"
+
+# Search across all projects
+stdai find "guest session" --all
 
 # Show full detail
 stdai show 01HXYZ...
 
-# Walk lineage
+# Walk lineage (crosses project boundaries)
 stdai upstream 01HXYZ... --recursive
 ```
 
-## Commands
+## Storage
 
-### `stdai init`
+stdai uses a single global store:
 
-Explicitly initialize a workspace in the current directory. This is **optional**
-— all commands auto-initialize on first use. Useful if you want to control
-exactly where the `.stdai/` directory is created.
-
-```bash
-stdai init
 ```
+~/.stdai/
+  objects/          Content-addressed blob store (SHA-256)
+    ab/
+      cdef1234...   Raw artifact content
+  stdai.db          SQLite database (metadata, lineage, FTS index)
+  config.toml       Configuration
+```
+
+Override the location with environment variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `$STDAI_HOME` | Override global store location |
+| `$XDG_DATA_HOME` | Standard XDG fallback (`$XDG_DATA_HOME/stdai/`) |
+| `$STDAI_PROJECT` | Override project context detection |
+
+Resolution order: `$STDAI_HOME` → `$XDG_DATA_HOME/stdai/` → `~/.stdai/`
+
+### Project context
+
+Every artifact is automatically tagged with the current project, detected from:
+
+1. `$STDAI_PROJECT` environment variable
+2. Git repo name (`git rev-parse --show-toplevel` basename)
+3. Current working directory basename
+
+`find` and `list` default to showing artifacts from the current project.
+Use `--all` to search globally, or `--project <name>` to query a specific project.
+
+## Commands
 
 ### `stdai write`
 
@@ -93,7 +120,7 @@ stdai write --kind note --content "middleware and session handling are the key f
 # Pipe mode — content passes through to stdout
 python3 producer.py | stdai write --kind research | python3 consumer.py
 
-# With lineage
+# With lineage (works across projects)
 stdai write --kind fact_check --content "confirmed findings" --based-on 01HABC...
 
 # With tags and metadata
@@ -133,8 +160,9 @@ echo "capture me" | stdai write --kind note --no-forward
 Full-text search across artifacts.
 
 ```bash
-stdai find auth
-stdai find "guest session"
+stdai find auth                           # Current project
+stdai find auth --all                     # All projects
+stdai find auth --project my-api          # Specific project
 stdai find --kind research auth
 stdai find --tag security
 stdai find --task auth-bug
@@ -158,7 +186,9 @@ Prefix matching is supported — `stdai show 01HX` works if the prefix is unique
 List recent artifacts.
 
 ```bash
-stdai list
+stdai list                                # Current project
+stdai list --all                          # All projects
+stdai list --project payments-service     # Specific project
 stdai list --kind research
 stdai list --tag security --limit 50
 stdai list --json
@@ -166,7 +196,7 @@ stdai list --json
 
 ### `stdai upstream`
 
-Show what an artifact is based on.
+Show what an artifact is based on. Operates globally — lineage crosses projects.
 
 ```bash
 stdai upstream 01HXYZ...              # Direct parents only
@@ -176,7 +206,7 @@ stdai upstream 01HXYZ... --json
 
 ### `stdai downstream`
 
-Show what was built from an artifact.
+Show what was built from an artifact. Operates globally.
 
 ```bash
 stdai downstream 01HXYZ...              # Direct children only
@@ -184,30 +214,31 @@ stdai downstream 01HXYZ... --recursive  # Full descendant graph
 stdai downstream 01HXYZ... --json
 ```
 
+### `stdai projects`
+
+List all known projects with artifact counts.
+
+```bash
+stdai projects
+stdai projects --json
+```
+
+### `stdai context`
+
+Show the current detected context.
+
+```bash
+stdai context
+stdai context --json
+```
+
 ### `stdai doctor`
 
-Run diagnostic checks on the workspace.
+Run diagnostic checks on the global store.
 
 ```bash
 stdai doctor
 ```
-
-## Storage Model
-
-stdai uses a local hybrid storage model:
-
-```
-.stdai/
-  objects/          Content-addressed blob store (SHA-256)
-    ab/
-      cdef1234...   Raw artifact content
-  stdai.db          SQLite database (metadata, lineage, FTS index)
-  config.toml       Workspace configuration
-```
-
-- **Object store**: Immutable, content-addressed. Same content = same hash = stored once.
-- **SQLite database**: Artifact records, `based_on` lineage links, tags, and FTS5 full-text index.
-- **Artifact IDs**: ULIDs — sortable, unique, timestamp-embedded.
 
 ## Example: Research Pipeline
 
@@ -232,6 +263,25 @@ stdai upstream "$id2" --recursive
 stdai downstream "$id1" --recursive
 ```
 
+## Example: Cross-Project Work
+
+```bash
+# In project A: research
+cd ~/projects/auth-service
+id=$(stdai write --kind research --content "Session tokens need rotation")
+
+# In project B: reference research from project A
+cd ~/projects/api-gateway
+stdai write --kind plan --content "Integrate token rotation from auth-service" \
+  --based-on "$id"
+
+# Search across all projects
+stdai find "token rotation" --all
+
+# See what you've worked on today
+stdai list --all
+```
+
 ## Example: Agent Handoff
 
 ```bash
@@ -242,6 +292,12 @@ python3 inspect_repo.py | stdai write --kind investigation --tag payments
 stdai find payments
 stdai show <artifact_id>
 ```
+
+## Migration from v0.x
+
+If you have existing per-project `.stdai/` directories from v0.x, they are
+automatically migrated to the global store on first use. The original directory
+is renamed to `.stdai.migrated/` (not deleted) so you can verify the migration.
 
 ## License
 

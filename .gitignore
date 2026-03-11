@@ -1,5 +1,7 @@
 /target
 .stdai/
+.stdai.migrated/
+.docs/
 *.swp
 *.swo
 *~

@@ -12,10 +12,7 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Init => {
-            let cwd = std::env::current_dir().expect("cannot determine current directory");
-            commands::init::run(&cwd)
-        }
+        Commands::Init => commands::init::run(),
         Commands::Write {
             kind,
             content,
@@ -46,6 +43,8 @@ fn main() {
             task,
             limit,
             json,
+            all,
+            project,
         } => commands::find::run(&commands::find::FindArgs {
             query,
             kind,
@@ -53,6 +52,8 @@ fn main() {
             task,
             limit,
             json,
+            all,
+            project,
         }),
         Commands::Show {
             id,
@@ -68,11 +69,15 @@ fn main() {
             tag,
             limit,
             json,
+            all,
+            project,
         } => commands::list::run(&commands::list::ListArgs {
             kind,
             tag,
             limit,
             json,
+            all,
+            project,
         }),
         Commands::Upstream {
             id,
@@ -93,6 +98,12 @@ fn main() {
             json,
         }),
         Commands::Doctor => commands::doctor::run(),
+        Commands::Projects { json } => {
+            commands::projects::run(&commands::projects::ProjectsArgs { json })
+        }
+        Commands::Context { json } => {
+            commands::context::run(&commands::context::ContextArgs { json })
+        }
     };
 
     if let Err(e) = result {

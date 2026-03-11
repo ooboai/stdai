@@ -8,7 +8,7 @@ pub struct DownstreamArgs {
 }
 
 pub fn run(args: &DownstreamArgs) -> Result<()> {
-    let ws = Workspace::find_or_init()?;
+    let ws = Workspace::open()?;
     let conn = db::open(&ws.db_path())?;
 
     let artifacts = db::get_downstream(&conn, &args.id, args.recursive)?;

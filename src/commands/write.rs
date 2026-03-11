@@ -25,7 +25,7 @@ pub fn run(args: &WriteArgs) -> Result<()> {
         return Err(Error::Other("no content provided".to_string()));
     }
 
-    let ws = Workspace::find_or_init()?;
+    let ws = Workspace::open()?;
     let conn = db::open(&ws.db_path())?;
 
     for parent_id in &args.based_on {
@@ -60,6 +60,7 @@ pub fn run(args: &WriteArgs) -> Result<()> {
         hostname: meta.hostname,
         source_mode: source_mode.clone(),
         preview,
+        project: meta.project,
         tags: args.tags.clone(),
         based_on: args.based_on.clone(),
     };

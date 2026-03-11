@@ -1,69 +1,52 @@
 pub mod db;
+pub mod migration;
 pub mod objects;
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::metadata;
 
 const DEFAULT_CONFIG: &str = "\
 [stdai]
-# Default configuration for stdai workspace
-# version = \"0.1\"
+# version = \"1.1\"
 ";
 
 pub struct Workspace {
     root: PathBuf,
+    project: Option<String>,
 }
 
 impl Workspace {
-    /// Walk up from cwd looking for an existing `.stdai/` directory.
-    pub fn find() -> Result<Self> {
-        let mut dir = std::env::current_dir()?;
-        loop {
-            let candidate = dir.join(".stdai");
-            if candidate.is_dir() {
-                return Ok(Self { root: candidate });
-            }
-            if !dir.pop() {
-                return Err(Error::NotInitialized);
+    /// Open (or create) the global store at the resolved path.
+    /// Auto-migrates any legacy per-project `.stdai/` found in the current project.
+    pub fn open() -> Result<Self> {
+        let root = global_store_path();
+
+        if !root.join("stdai.db").exists() {
+            std::fs::create_dir_all(root.join("objects"))?;
+            db::initialize(&root.join("stdai.db"))?;
+            std::fs::write(root.join("config.toml"), DEFAULT_CONFIG)?;
+        }
+
+        let project = metadata::detect_project();
+
+        if let Some(proj_root) = metadata::project_root() {
+            let legacy = proj_root.join(".stdai");
+            if legacy.is_dir() {
+                if let Err(e) = migration::migrate_legacy(&legacy, &root, project.as_deref()) {
+                    eprintln!("stdai: migration warning: {}", e);
+                }
             }
         }
+
+        Ok(Self { root, project })
     }
 
-    /// Find an existing workspace, or transparently create one.
-    /// Prefers the git repo root; falls back to cwd.
+    /// Alias kept for backward compatibility during transition.
+    #[allow(dead_code)]
     pub fn find_or_init() -> Result<Self> {
-        match Self::find() {
-            Ok(ws) => Ok(ws),
-            Err(Error::NotInitialized) => {
-                let target = auto_init_target();
-                let ws = Self::init_at(&target)?;
-                eprintln!(
-                    "stdai: auto-initialized workspace at {}",
-                    ws.root().display()
-                );
-                Ok(ws)
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Explicitly create a workspace (used by `stdai init`).
-    pub fn create(at: &Path) -> Result<Self> {
-        let root = at.join(".stdai");
-        if root.is_dir() {
-            return Err(Error::AlreadyInitialized(root.display().to_string()));
-        }
-        Self::init_at(at)
-    }
-
-    fn init_at(at: &Path) -> Result<Self> {
-        let root = at.join(".stdai");
-        std::fs::create_dir_all(root.join("objects"))?;
-        db::initialize(&root.join("stdai.db"))?;
-        std::fs::write(root.join("config.toml"), DEFAULT_CONFIG)?;
-        Ok(Self { root })
+        Self::open()
     }
 
     pub fn root(&self) -> &Path {
@@ -78,20 +61,29 @@ impl Workspace {
         self.root.join("stdai.db")
     }
 
-    #[allow(dead_code)]
-    pub fn config_path(&self) -> PathBuf {
-        self.root.join("config.toml")
+    pub fn project(&self) -> Option<&str> {
+        self.project.as_deref()
     }
 }
 
-fn auto_init_target() -> PathBuf {
-    Command::new("git")
-        .args(["rev-parse", "--show-toplevel"])
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| PathBuf::from(s.trim()))
-        .unwrap_or_else(|| std::env::current_dir().expect("cannot determine current directory"))
+/// Resolve the global store path.
+/// Priority: $STDAI_HOME > $XDG_DATA_HOME/stdai > ~/.stdai
+pub fn global_store_path() -> PathBuf {
+    if let Ok(home) = std::env::var("STDAI_HOME") {
+        if !home.is_empty() {
+            return PathBuf::from(home);
+        }
+    }
+    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+        if !xdg.is_empty() {
+            return PathBuf::from(xdg).join("stdai");
+        }
+    }
+    home_dir().join(".stdai")
+}
+
+fn home_dir() -> PathBuf {
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("."))
 }

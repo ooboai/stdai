@@ -1,10 +1,10 @@
-use std::path::Path;
-
 use crate::error::Result;
-use crate::storage::Workspace;
 
-pub fn run(path: &Path) -> Result<()> {
-    let ws = Workspace::create(path)?;
-    eprintln!("initialized stdai workspace at {}", ws.root().display());
+pub fn run() -> Result<()> {
+    eprintln!(
+        "stdai: `init` is no longer needed — the global store auto-creates on first use.\n\
+         Storage location: {}",
+        crate::storage::global_store_path().display(),
+    );
     Ok(())
 }

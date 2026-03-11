@@ -2,54 +2,42 @@ mod common;
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::path::Path;
 
 fn stdai() -> Command {
     common::stdai()
 }
 
-// ─── init ───────────────────────────────────────────────────────────────────
-
-#[test]
-fn init_creates_workspace() {
-    let dir = tempfile::tempdir().unwrap();
-    stdai()
-        .arg("init")
-        .current_dir(dir.path())
-        .assert()
-        .success()
-        .stderr(predicate::str::contains("initialized"));
-
-    assert!(dir.path().join(".stdai").is_dir());
-    assert!(dir.path().join(".stdai/objects").is_dir());
-    assert!(dir.path().join(".stdai/stdai.db").exists());
-    assert!(dir.path().join(".stdai/config.toml").exists());
+fn cmd(home: &Path) -> Command {
+    common::stdai_cmd(home)
 }
 
+// ─── init (deprecated) ─────────────────────────────────────────────────────
+
 #[test]
-fn init_fails_if_already_initialized() {
-    let dir = common::create_workspace();
-    stdai()
+fn init_prints_deprecation_message() {
+    let env = common::create_test_env();
+    cmd(env.path())
         .arg("init")
-        .current_dir(dir.path())
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("already initialized"));
+        .success()
+        .stderr(predicate::str::contains("no longer needed"));
 }
 
 // ─── write (direct mode) ───────────────────────────────────────────────────
 
 #[test]
 fn write_direct_returns_artifact_id() {
-    let dir = common::create_workspace();
-    let id = common::write_artifact(dir.path(), "note", "hello world");
+    let env = common::create_test_env();
+    let id = common::write_artifact(env.path(), "note", "hello world");
     assert!(!id.is_empty());
     assert!(id.len() >= 20, "expected ULID-length ID, got: {}", id);
 }
 
 #[test]
 fn write_direct_json_returns_full_artifact() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", "hello world");
+    let env = common::create_test_env();
+    let val = common::write_artifact_json(env.path(), "note", "hello world");
     assert_eq!(val["kind"], "note");
     assert!(val["id"].as_str().unwrap().len() >= 20);
     assert!(val["content_hash"].as_str().is_some());
@@ -57,14 +45,25 @@ fn write_direct_json_returns_full_artifact() {
 }
 
 #[test]
-fn write_creates_object_file() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", "test object storage");
+fn write_records_project_on_artifact() {
+    let env = common::create_test_env();
+    let val = common::write_artifact_json(env.path(), "note", "project test");
+    assert_eq!(val["project"], "test-project");
+}
+
+#[test]
+fn write_creates_object_file_in_global_store() {
+    let env = common::create_test_env();
+    let val = common::write_artifact_json(env.path(), "note", "test object storage");
     let hash = val["content_hash"].as_str().unwrap();
     let prefix = &hash[..2];
     let suffix = &hash[2..];
-    let obj_path = dir.path().join(".stdai/objects").join(prefix).join(suffix);
-    assert!(obj_path.exists(), "object file should exist at {:?}", obj_path);
+    let obj_path = env.path().join("objects").join(prefix).join(suffix);
+    assert!(
+        obj_path.exists(),
+        "object file should exist at {:?}",
+        obj_path
+    );
 
     let stored = std::fs::read_to_string(&obj_path).unwrap();
     assert_eq!(stored, "test object storage");
@@ -72,22 +71,21 @@ fn write_creates_object_file() {
 
 #[test]
 fn write_deduplicates_content() {
-    let dir = common::create_workspace();
-    let v1 = common::write_artifact_json(dir.path(), "note", "duplicate content");
-    let v2 = common::write_artifact_json(dir.path(), "note", "duplicate content");
+    let env = common::create_test_env();
+    let v1 = common::write_artifact_json(env.path(), "note", "duplicate content");
+    let v2 = common::write_artifact_json(env.path(), "note", "duplicate content");
     assert_eq!(v1["content_hash"], v2["content_hash"]);
     assert_ne!(v1["id"], v2["id"], "artifacts should have distinct IDs");
 }
 
 #[test]
 fn write_with_tags() {
-    let dir = common::create_workspace();
-    let output = stdai()
+    let env = common::create_test_env();
+    let output = cmd(env.path())
         .args([
             "write", "--kind", "note", "--content", "tagged content",
             "--tag", "security", "--tag", "auth", "--json",
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -99,13 +97,12 @@ fn write_with_tags() {
 
 #[test]
 fn write_with_name_and_agent() {
-    let dir = common::create_workspace();
-    let output = stdai()
+    let env = common::create_test_env();
+    let output = cmd(env.path())
         .args([
             "write", "--kind", "research", "--content", "findings",
             "--name", "Auth Flow Analysis", "--agent", "cursor", "--json",
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -116,42 +113,35 @@ fn write_with_name_and_agent() {
 
 #[test]
 fn write_empty_content_fails() {
-    let dir = common::create_workspace();
-    stdai()
+    let env = common::create_test_env();
+    cmd(env.path())
         .args(["write", "--kind", "note", "--content", ""])
-        .current_dir(dir.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains("no content"));
 }
 
 #[test]
-fn write_auto_initializes_workspace() {
-    let dir = tempfile::tempdir().unwrap();
-    assert!(!dir.path().join(".stdai").exists());
+fn write_auto_creates_global_store() {
+    let env = common::create_test_env();
+    assert!(!env.path().join("stdai.db").exists());
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["write", "--kind", "note", "--content", "hello"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
-    assert!(output.status.success(), "write should auto-init");
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("auto-initialized"), "stderr: {}", stderr);
-    assert!(dir.path().join(".stdai").is_dir());
-    assert!(dir.path().join(".stdai/objects").is_dir());
-    assert!(dir.path().join(".stdai/stdai.db").exists());
+    assert!(output.status.success(), "write should auto-create store");
+    assert!(env.path().join("stdai.db").exists());
+    assert!(env.path().join("objects").is_dir());
 }
 
 // ─── write (pipe mode) ─────────────────────────────────────────────────────
 
 #[test]
 fn pipe_passthrough_preserves_content() {
-    let dir = common::create_workspace();
-    let output = stdai()
+    let env = common::create_test_env();
+    let output = cmd(env.path())
         .args(["write", "--kind", "research"])
-        .current_dir(dir.path())
         .write_stdin("piped content here")
         .output()
         .unwrap();
@@ -166,10 +156,9 @@ fn pipe_passthrough_preserves_content() {
 
 #[test]
 fn pipe_no_forward_suppresses_stdout() {
-    let dir = common::create_workspace();
-    let output = stdai()
+    let env = common::create_test_env();
+    let output = cmd(env.path())
         .args(["write", "--kind", "note", "--no-forward"])
-        .current_dir(dir.path())
         .write_stdin("capture only")
         .output()
         .unwrap();
@@ -183,11 +172,10 @@ fn pipe_no_forward_suppresses_stdout() {
 
 #[test]
 fn pipe_multiline_content() {
-    let dir = common::create_workspace();
+    let env = common::create_test_env();
     let multiline = "line 1\nline 2\nline 3\n";
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["write", "--kind", "note"])
-        .current_dir(dir.path())
         .write_stdin(multiline)
         .output()
         .unwrap();
@@ -199,14 +187,13 @@ fn pipe_multiline_content() {
 
 #[test]
 fn write_with_based_on() {
-    let dir = common::create_workspace();
-    let id1 = common::write_artifact(dir.path(), "research", "research findings");
-    let output = stdai()
+    let env = common::create_test_env();
+    let id1 = common::write_artifact(env.path(), "research", "research findings");
+    let output = cmd(env.path())
         .args([
             "write", "--kind", "fact_check", "--content", "validated",
             "--based-on", &id1, "--json",
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -218,13 +205,12 @@ fn write_with_based_on() {
 
 #[test]
 fn write_based_on_invalid_id_fails() {
-    let dir = common::create_workspace();
-    stdai()
+    let env = common::create_test_env();
+    cmd(env.path())
         .args([
             "write", "--kind", "note", "--content", "orphan",
             "--based-on", "NONEXISTENT_ID",
         ])
-        .current_dir(dir.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains("not found"));
@@ -232,15 +218,14 @@ fn write_based_on_invalid_id_fails() {
 
 #[test]
 fn write_multiple_based_on() {
-    let dir = common::create_workspace();
-    let id1 = common::write_artifact(dir.path(), "research", "first");
-    let id2 = common::write_artifact(dir.path(), "research", "second");
-    let output = stdai()
+    let env = common::create_test_env();
+    let id1 = common::write_artifact(env.path(), "research", "first");
+    let id2 = common::write_artifact(env.path(), "research", "second");
+    let output = cmd(env.path())
         .args([
             "write", "--kind", "summary", "--content", "combined",
             "--based-on", &id1, "--based-on", &id2, "--json",
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -249,15 +234,64 @@ fn write_multiple_based_on() {
     assert_eq!(based_on.len(), 2);
 }
 
+// ─── cross-project lineage ─────────────────────────────────────────────────
+
+#[test]
+fn cross_project_based_on() {
+    let env = common::create_test_env();
+    let id_a = common::write_artifact_in_project(env.path(), "project-a", "research", "from project A");
+
+    let output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "project-b")
+        .args([
+            "write", "--kind", "summary", "--content", "references project A",
+            "--based-on", &id_a, "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(val["project"], "project-b");
+    assert_eq!(val["based_on"][0], id_a);
+}
+
+#[test]
+fn upstream_crosses_project_boundaries() {
+    let env = common::create_test_env();
+    let parent = common::write_artifact_in_project(env.path(), "project-a", "research", "parent in A");
+
+    let child_output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "project-b")
+        .args([
+            "write", "--kind", "summary", "--content", "child in B",
+            "--based-on", &parent,
+        ])
+        .output()
+        .unwrap();
+    let child_id = String::from_utf8(child_output.stdout).unwrap().trim().to_string();
+
+    let output = cmd(env.path())
+        .args(["upstream", &child_id, "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["id"], parent);
+    assert_eq!(arr[0]["project"], "project-a");
+}
+
 // ─── show ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn show_displays_artifact() {
-    let dir = common::create_workspace();
-    let id = common::write_artifact(dir.path(), "note", "show me this");
-    stdai()
+    let env = common::create_test_env();
+    let id = common::write_artifact(env.path(), "note", "show me this");
+    cmd(env.path())
         .args(["show", &id])
-        .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("show me this"))
@@ -266,11 +300,10 @@ fn show_displays_artifact() {
 
 #[test]
 fn show_json_output() {
-    let dir = common::create_workspace();
-    let id = common::write_artifact(dir.path(), "note", "json show test");
-    let output = stdai()
+    let env = common::create_test_env();
+    let id = common::write_artifact(env.path(), "note", "json show test");
+    let output = cmd(env.path())
         .args(["show", &id, "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -281,11 +314,10 @@ fn show_json_output() {
 
 #[test]
 fn show_content_only() {
-    let dir = common::create_workspace();
-    let id = common::write_artifact(dir.path(), "note", "raw content only");
-    let output = stdai()
+    let env = common::create_test_env();
+    let id = common::write_artifact(env.path(), "note", "raw content only");
+    let output = cmd(env.path())
         .args(["show", &id, "--content-only"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -294,12 +326,11 @@ fn show_content_only() {
 
 #[test]
 fn show_prefix_match() {
-    let dir = common::create_workspace();
-    let id = common::write_artifact(dir.path(), "note", "prefix test");
+    let env = common::create_test_env();
+    let id = common::write_artifact(env.path(), "note", "prefix test");
     let prefix = &id[..8];
-    stdai()
+    cmd(env.path())
         .args(["show", prefix])
-        .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("prefix test"));
@@ -307,10 +338,9 @@ fn show_prefix_match() {
 
 #[test]
 fn show_not_found() {
-    let dir = common::create_workspace();
-    stdai()
+    let env = common::create_test_env();
+    cmd(env.path())
         .args(["show", "NONEXISTENT"])
-        .current_dir(dir.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains("not found"));
@@ -320,13 +350,12 @@ fn show_not_found() {
 
 #[test]
 fn find_by_text() {
-    let dir = common::create_workspace();
-    common::write_artifact(dir.path(), "research", "oauth vulnerability analysis");
-    common::write_artifact(dir.path(), "note", "unrelated stuff");
+    let env = common::create_test_env();
+    common::write_artifact(env.path(), "research", "oauth vulnerability analysis");
+    common::write_artifact(env.path(), "note", "unrelated stuff");
 
-    stdai()
+    cmd(env.path())
         .args(["find", "oauth"])
-        .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("oauth"));
@@ -334,13 +363,12 @@ fn find_by_text() {
 
 #[test]
 fn find_by_kind_filter() {
-    let dir = common::create_workspace();
-    common::write_artifact(dir.path(), "research", "some research");
-    common::write_artifact(dir.path(), "note", "some note");
+    let env = common::create_test_env();
+    common::write_artifact(env.path(), "research", "some research");
+    common::write_artifact(env.path(), "note", "some note");
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["find", "--kind", "research", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -351,20 +379,18 @@ fn find_by_kind_filter() {
 
 #[test]
 fn find_by_tag_filter() {
-    let dir = common::create_workspace();
-    stdai()
+    let env = common::create_test_env();
+    cmd(env.path())
         .args([
             "write", "--kind", "note", "--content", "security related",
             "--tag", "security",
         ])
-        .current_dir(dir.path())
         .assert()
         .success();
-    common::write_artifact(dir.path(), "note", "untagged");
+    common::write_artifact(env.path(), "note", "untagged");
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["find", "--tag", "security", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -375,28 +401,82 @@ fn find_by_tag_filter() {
 
 #[test]
 fn find_no_results() {
-    let dir = common::create_workspace();
-    common::write_artifact(dir.path(), "note", "hello world");
-    stdai()
+    let env = common::create_test_env();
+    common::write_artifact(env.path(), "note", "hello world");
+    cmd(env.path())
         .args(["find", "xyznonexistent"])
-        .current_dir(dir.path())
         .assert()
         .success()
         .stderr(predicate::str::contains("no artifacts"));
+}
+
+#[test]
+fn find_scoped_to_current_project() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "shared keyword stuff");
+    common::write_artifact_in_project(env.path(), "beta", "note", "shared keyword stuff");
+
+    let output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "alpha")
+        .args(["find", "shared", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["project"], "alpha");
+}
+
+#[test]
+fn find_all_returns_all_projects() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "shared keyword stuff");
+    common::write_artifact_in_project(env.path(), "beta", "note", "shared keyword stuff");
+
+    let output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "alpha")
+        .args(["find", "shared", "--all", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 2);
+}
+
+#[test]
+fn find_with_project_flag() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "unique alpha content");
+    common::write_artifact_in_project(env.path(), "beta", "note", "unique beta content");
+
+    let output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "alpha")
+        .args(["find", "unique", "--project", "beta", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["project"], "beta");
 }
 
 // ─── list ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn list_shows_recent_artifacts() {
-    let dir = common::create_workspace();
-    common::write_artifact(dir.path(), "note", "first");
-    common::write_artifact(dir.path(), "note", "second");
-    common::write_artifact(dir.path(), "research", "third");
+    let env = common::create_test_env();
+    common::write_artifact(env.path(), "note", "first");
+    common::write_artifact(env.path(), "note", "second");
+    common::write_artifact(env.path(), "research", "third");
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["list", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -406,13 +486,12 @@ fn list_shows_recent_artifacts() {
 
 #[test]
 fn list_filter_by_kind() {
-    let dir = common::create_workspace();
-    common::write_artifact(dir.path(), "note", "a note");
-    common::write_artifact(dir.path(), "research", "a research");
+    let env = common::create_test_env();
+    common::write_artifact(env.path(), "note", "a note");
+    common::write_artifact(env.path(), "research", "a research");
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["list", "--kind", "research", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -424,14 +503,13 @@ fn list_filter_by_kind() {
 
 #[test]
 fn list_respects_limit() {
-    let dir = common::create_workspace();
+    let env = common::create_test_env();
     for i in 0..5 {
-        common::write_artifact(dir.path(), "note", &format!("item {}", i));
+        common::write_artifact(env.path(), "note", &format!("item {}", i));
     }
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["list", "--limit", "3", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -439,26 +517,79 @@ fn list_respects_limit() {
     assert_eq!(val.as_array().unwrap().len(), 3);
 }
 
+#[test]
+fn list_scoped_to_current_project() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "alpha item");
+    common::write_artifact_in_project(env.path(), "beta", "note", "beta item");
+
+    let output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "alpha")
+        .args(["list", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["project"], "alpha");
+}
+
+#[test]
+fn list_all_returns_all_projects() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "alpha item");
+    common::write_artifact_in_project(env.path(), "beta", "note", "beta item");
+
+    let output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "alpha")
+        .args(["list", "--all", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(val.as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn list_with_project_flag() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "alpha item");
+    common::write_artifact_in_project(env.path(), "beta", "note", "beta item");
+
+    let output = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "alpha")
+        .args(["list", "--project", "beta", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["project"], "beta");
+}
+
 // ─── upstream / downstream ─────────────────────────────────────────────────
 
 #[test]
 fn upstream_shows_parents() {
-    let dir = common::create_workspace();
-    let parent = common::write_artifact(dir.path(), "research", "parent research");
-    let child_output = stdai()
+    let env = common::create_test_env();
+    let parent = common::write_artifact(env.path(), "research", "parent research");
+    let child_output = cmd(env.path())
         .args([
             "write", "--kind", "fact_check", "--content", "child fact check",
             "--based-on", &parent, "--json",
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     let child: serde_json::Value = serde_json::from_slice(&child_output.stdout).unwrap();
     let child_id = child["id"].as_str().unwrap();
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["upstream", child_id, "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -470,21 +601,22 @@ fn upstream_shows_parents() {
 
 #[test]
 fn downstream_shows_children() {
-    let dir = common::create_workspace();
-    let parent = common::write_artifact(dir.path(), "research", "parent");
-    let child_output = stdai()
+    let env = common::create_test_env();
+    let parent = common::write_artifact(env.path(), "research", "parent");
+    let child_output = cmd(env.path())
         .args([
             "write", "--kind", "summary", "--content", "child",
             "--based-on", &parent,
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
-    let child_id = String::from_utf8(child_output.stdout).unwrap().trim().to_string();
+    let child_id = String::from_utf8(child_output.stdout)
+        .unwrap()
+        .trim()
+        .to_string();
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["downstream", &parent, "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -496,40 +628,40 @@ fn downstream_shows_children() {
 
 #[test]
 fn upstream_recursive() {
-    let dir = common::create_workspace();
-    let a = common::write_artifact(dir.path(), "research", "grandparent");
-    let b_output = stdai()
+    let env = common::create_test_env();
+    let a = common::write_artifact(env.path(), "research", "grandparent");
+    let b_output = cmd(env.path())
         .args([
             "write", "--kind", "fact_check", "--content", "parent",
             "--based-on", &a,
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
-    let b = String::from_utf8(b_output.stdout).unwrap().trim().to_string();
-    let c_output = stdai()
+    let b = String::from_utf8(b_output.stdout)
+        .unwrap()
+        .trim()
+        .to_string();
+    let c_output = cmd(env.path())
         .args([
             "write", "--kind", "summary", "--content", "child",
             "--based-on", &b,
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
-    let c = String::from_utf8(c_output.stdout).unwrap().trim().to_string();
+    let c = String::from_utf8(c_output.stdout)
+        .unwrap()
+        .trim()
+        .to_string();
 
-    // Non-recursive: only direct parent
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["upstream", &c, "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(val.as_array().unwrap().len(), 1);
 
-    // Recursive: grandparent + parent
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["upstream", &c, "--recursive", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -540,17 +672,17 @@ fn upstream_recursive() {
 
 #[test]
 fn same_content_same_hash() {
-    let dir = common::create_workspace();
-    let v1 = common::write_artifact_json(dir.path(), "note", "identical");
-    let v2 = common::write_artifact_json(dir.path(), "note", "identical");
+    let env = common::create_test_env();
+    let v1 = common::write_artifact_json(env.path(), "note", "identical");
+    let v2 = common::write_artifact_json(env.path(), "note", "identical");
     assert_eq!(v1["content_hash"], v2["content_hash"]);
 }
 
 #[test]
 fn different_content_different_hash() {
-    let dir = common::create_workspace();
-    let v1 = common::write_artifact_json(dir.path(), "note", "alpha");
-    let v2 = common::write_artifact_json(dir.path(), "note", "beta");
+    let env = common::create_test_env();
+    let v1 = common::write_artifact_json(env.path(), "note", "alpha");
+    let v2 = common::write_artifact_json(env.path(), "note", "beta");
     assert_ne!(v1["content_hash"], v2["content_hash"]);
 }
 
@@ -558,34 +690,34 @@ fn different_content_different_hash() {
 
 #[test]
 fn detects_json_format() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", r#"{"key": "value"}"#);
+    let env = common::create_test_env();
+    let val = common::write_artifact_json(env.path(), "note", r#"{"key": "value"}"#);
     assert_eq!(val["content_format"], "json");
 }
 
 #[test]
 fn detects_markdown_format() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", "# Heading\n\nSome **bold** text");
+    let env = common::create_test_env();
+    let val =
+        common::write_artifact_json(env.path(), "note", "# Heading\n\nSome **bold** text");
     assert_eq!(val["content_format"], "md");
 }
 
 #[test]
 fn detects_text_format() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", "plain text content here");
+    let env = common::create_test_env();
+    let val = common::write_artifact_json(env.path(), "note", "plain text content here");
     assert_eq!(val["content_format"], "text");
 }
 
 #[test]
 fn explicit_format_override() {
-    let dir = common::create_workspace();
-    let output = stdai()
+    let env = common::create_test_env();
+    let output = cmd(env.path())
         .args([
             "write", "--kind", "note", "--content", "not really json",
             "--format", "json", "--json",
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -597,51 +729,103 @@ fn explicit_format_override() {
 
 #[test]
 fn captures_cwd_metadata() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", "metadata test");
+    let env = common::create_test_env();
+    let val = common::write_artifact_json(env.path(), "note", "metadata test");
     assert!(val["cwd"].as_str().is_some());
     assert!(!val["cwd"].as_str().unwrap().is_empty());
 }
 
 #[test]
-fn captures_hostname() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", "hostname test");
-    // hostname may or may not be captured depending on environment
-    // just check the field exists in the response
-    assert!(val.get("hostname").is_some() || val.get("hostname").is_none());
-}
-
-#[test]
 fn captures_session_id() {
-    let dir = common::create_workspace();
-    let val = common::write_artifact_json(dir.path(), "note", "session test");
+    let env = common::create_test_env();
+    let val = common::write_artifact_json(env.path(), "note", "session test");
     assert!(val["session_id"].as_str().is_some());
 }
 
 // ─── doctor ─────────────────────────────────────────────────────────────────
 
 #[test]
-fn doctor_on_valid_workspace() {
-    let dir = common::create_workspace();
-    stdai()
+fn doctor_on_global_store() {
+    let env = common::create_test_env();
+    common::write_artifact(env.path(), "note", "seed");
+
+    cmd(env.path())
         .arg("doctor")
-        .current_dir(dir.path())
         .assert()
         .success()
-        .stdout(predicate::str::contains("ok"));
+        .stdout(predicate::str::contains("ok"))
+        .stdout(predicate::str::contains("global store"));
+}
+
+// ─── projects ───────────────────────────────────────────────────────────────
+
+#[test]
+fn projects_lists_known_projects() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "from alpha");
+    common::write_artifact_in_project(env.path(), "beta", "note", "from beta");
+
+    let output = cmd(env.path())
+        .args(["projects", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    assert_eq!(arr.len(), 2);
+    let names: Vec<&str> = arr
+        .iter()
+        .map(|p| p["project"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"alpha"));
+    assert!(names.contains(&"beta"));
+}
+
+#[test]
+fn projects_shows_artifact_counts() {
+    let env = common::create_test_env();
+    common::write_artifact_in_project(env.path(), "alpha", "note", "one");
+    common::write_artifact_in_project(env.path(), "alpha", "note", "two");
+    common::write_artifact_in_project(env.path(), "beta", "note", "one");
+
+    let output = cmd(env.path())
+        .args(["projects", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let arr = val.as_array().unwrap();
+    let alpha = arr.iter().find(|p| p["project"] == "alpha").unwrap();
+    assert_eq!(alpha["artifacts"], 2);
+}
+
+// ─── context ────────────────────────────────────────────────────────────────
+
+#[test]
+fn context_shows_current_project() {
+    let env = common::create_test_env();
+    common::write_artifact(env.path(), "note", "seed");
+
+    let output = cmd(env.path())
+        .args(["context", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let val: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(val["project"], "test-project");
+    assert!(val["global_store"].as_str().is_some());
+    assert_eq!(val["project_artifacts"], 1);
 }
 
 // ─── edge cases ─────────────────────────────────────────────────────────────
 
 #[test]
 fn large_content() {
-    let dir = common::create_workspace();
+    let env = common::create_test_env();
     let large = "x".repeat(100_000);
-    let id = common::write_artifact(dir.path(), "note", &large);
-    let output = stdai()
+    let id = common::write_artifact(env.path(), "note", &large);
+    let output = cmd(env.path())
         .args(["show", &id, "--content-only"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -650,20 +834,18 @@ fn large_content() {
 
 #[test]
 fn find_with_task_filter() {
-    let dir = common::create_workspace();
-    stdai()
+    let env = common::create_test_env();
+    cmd(env.path())
         .args([
             "write", "--kind", "note", "--content", "bug investigation",
             "--task", "auth-bug",
         ])
-        .current_dir(dir.path())
         .assert()
         .success();
-    common::write_artifact(dir.path(), "note", "other work");
+    common::write_artifact(env.path(), "note", "other work");
 
-    let output = stdai()
+    let output = cmd(env.path())
         .args(["find", "--task", "auth-bug", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     assert!(output.status.success());
@@ -673,65 +855,116 @@ fn find_with_task_filter() {
     assert_eq!(arr[0]["task_id"], "auth-bug");
 }
 
-// ─── full pipeline scenario from PRD ────────────────────────────────────────
+// ─── full pipeline scenario ─────────────────────────────────────────────────
 
 #[test]
 fn prd_scenario_research_to_fact_check_to_summary() {
-    let dir = common::create_workspace();
+    let env = common::create_test_env();
 
-    let research_id = common::write_artifact(dir.path(), "research", "oauth flow has vulnerability in token refresh");
+    let research_id = common::write_artifact(
+        env.path(),
+        "research",
+        "oauth flow has vulnerability in token refresh",
+    );
 
-    let fc_output = stdai()
+    let fc_output = cmd(env.path())
         .args([
-            "write", "--kind", "fact_check", "--content", "confirmed: token refresh lacks PKCE",
-            "--based-on", &research_id,
+            "write",
+            "--kind",
+            "fact_check",
+            "--content",
+            "confirmed: token refresh lacks PKCE",
+            "--based-on",
+            &research_id,
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
-    let fc_id = String::from_utf8(fc_output.stdout).unwrap().trim().to_string();
+    let fc_id = String::from_utf8(fc_output.stdout)
+        .unwrap()
+        .trim()
+        .to_string();
 
-    let sum_output = stdai()
+    let sum_output = cmd(env.path())
         .args([
-            "write", "--kind", "summary", "--content", "critical: add PKCE to oauth refresh flow",
-            "--based-on", &fc_id,
+            "write",
+            "--kind",
+            "summary",
+            "--content",
+            "critical: add PKCE to oauth refresh flow",
+            "--based-on",
+            &fc_id,
         ])
-        .current_dir(dir.path())
         .output()
         .unwrap();
-    let sum_id = String::from_utf8(sum_output.stdout).unwrap().trim().to_string();
+    let sum_id = String::from_utf8(sum_output.stdout)
+        .unwrap()
+        .trim()
+        .to_string();
 
-    // Verify lineage: summary -> fact_check -> research
-    let up = stdai()
+    let up = cmd(env.path())
         .args(["upstream", &sum_id, "--recursive", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     let ancestors: serde_json::Value = serde_json::from_slice(&up.stdout).unwrap();
     assert_eq!(ancestors.as_array().unwrap().len(), 2);
 
-    // Verify downstream from research
-    let down = stdai()
+    let down = cmd(env.path())
         .args(["downstream", &research_id, "--recursive", "--json"])
-        .current_dir(dir.path())
         .output()
         .unwrap();
     let descendants: serde_json::Value = serde_json::from_slice(&down.stdout).unwrap();
     assert_eq!(descendants.as_array().unwrap().len(), 2);
 
-    // Find by text
-    stdai()
+    cmd(env.path())
         .args(["find", "oauth"])
-        .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("research"));
 
-    // Show individual artifact
-    stdai()
+    cmd(env.path())
         .args(["show", &research_id])
-        .current_dir(dir.path())
         .assert()
         .success()
         .stdout(predicate::str::contains("oauth flow has vulnerability"));
+}
+
+// ─── env var resolution ─────────────────────────────────────────────────────
+
+#[test]
+fn stdai_home_overrides_store_location() {
+    let custom = tempfile::tempdir().unwrap();
+    stdai()
+        .env("STDAI_HOME", custom.path())
+        .env("STDAI_PROJECT", "env-test")
+        .args(["write", "--kind", "note", "--content", "custom home"])
+        .assert()
+        .success();
+    assert!(custom.path().join("stdai.db").exists());
+}
+
+#[test]
+fn xdg_data_home_fallback() {
+    let xdg = tempfile::tempdir().unwrap();
+    stdai()
+        .env("XDG_DATA_HOME", xdg.path())
+        .env_remove("STDAI_HOME")
+        .env("STDAI_PROJECT", "xdg-test")
+        .args(["write", "--kind", "note", "--content", "xdg path"])
+        .assert()
+        .success();
+    assert!(xdg.path().join("stdai").join("stdai.db").exists());
+}
+
+#[test]
+fn stdai_project_env_overrides_detection() {
+    let env = common::create_test_env();
+    let val = stdai()
+        .env("STDAI_HOME", env.path())
+        .env("STDAI_PROJECT", "custom-project-name")
+        .args(["write", "--kind", "note", "--content", "project override", "--json"])
+        .output()
+        .unwrap();
+    assert!(val.status.success());
+    let artifact: serde_json::Value = serde_json::from_slice(&val.stdout).unwrap();
+    assert_eq!(artifact["project"], "custom-project-name");
 }

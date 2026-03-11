@@ -8,7 +8,7 @@ pub struct ShowArgs {
 }
 
 pub fn run(args: &ShowArgs) -> Result<()> {
-    let ws = Workspace::find_or_init()?;
+    let ws = Workspace::open()?;
     let conn = db::open(&ws.db_path())?;
     let artifact = db::get_artifact_full(&conn, &args.id)?;
 

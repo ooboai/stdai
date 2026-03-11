@@ -11,12 +11,6 @@ pub enum Error {
     #[error("{0}")]
     Json(#[from] serde_json::Error),
 
-    #[error("not initialized — run `stdai init` first")]
-    NotInitialized,
-
-    #[error("already initialized at {0}")]
-    AlreadyInitialized(String),
-
     #[error("artifact not found: {0}")]
     NotFound(String),
 

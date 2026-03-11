@@ -16,7 +16,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Initialize a stdai workspace in the current directory
+    /// Initialize a stdai workspace (deprecated — global store auto-creates)
+    #[command(hide = true)]
     Init,
 
     /// Write an artifact (from --content or stdin pipe)
@@ -86,6 +87,14 @@ pub enum Commands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+
+        /// Search across all projects instead of just the current one
+        #[arg(long)]
+        all: bool,
+
+        /// Filter by a specific project name
+        #[arg(long)]
+        project: Option<String>,
     },
 
     /// Show full artifact detail
@@ -119,6 +128,14 @@ pub enum Commands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+
+        /// List across all projects instead of just the current one
+        #[arg(long)]
+        all: bool,
+
+        /// Filter by a specific project name
+        #[arg(long)]
+        project: Option<String>,
     },
 
     /// Show upstream artifacts (what this artifact is based on)
@@ -149,6 +166,20 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Run diagnostic checks on the workspace
+    /// Run diagnostic checks on the global store
     Doctor,
+
+    /// List all known projects
+    Projects {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show the current detected context
+    Context {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }

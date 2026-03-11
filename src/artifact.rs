@@ -33,6 +33,8 @@ pub struct Artifact {
     pub source_mode: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preview: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -121,6 +123,9 @@ impl Artifact {
         out.push_str(&format!("Format    {}\n", self.content_format));
         out.push_str(&format!("Created   {}\n", self.created_at));
         out.push_str(&format!("Size      {} bytes\n", self.size_bytes));
+        if let Some(ref p) = self.project {
+            out.push_str(&format!("Project   {}\n", p));
+        }
         if !self.tags.is_empty() {
             out.push_str(&format!("Tags      {}\n", self.tags.join(", ")));
         }

@@ -6,36 +6,64 @@ pub fn stdai() -> Command {
     Command::cargo_bin("stdai").unwrap()
 }
 
-pub fn init_workspace(dir: &Path) {
-    stdai()
-        .arg("init")
-        .current_dir(dir)
-        .assert()
-        .success();
+/// Create an isolated global store for testing.
+/// Returns a TempDir whose path should be passed as STDAI_HOME.
+pub fn create_test_env() -> TempDir {
+    TempDir::new().unwrap()
 }
 
-pub fn create_workspace() -> TempDir {
-    let dir = TempDir::new().unwrap();
-    init_workspace(dir.path());
-    dir
+/// Build a command with STDAI_HOME and STDAI_PROJECT set for isolation.
+pub fn stdai_cmd(home: &Path) -> Command {
+    let mut cmd = stdai();
+    cmd.env("STDAI_HOME", home);
+    cmd.env("STDAI_PROJECT", "test-project");
+    cmd
 }
 
-pub fn write_artifact(dir: &Path, kind: &str, content: &str) -> String {
-    let output = stdai()
+pub fn write_artifact(home: &Path, kind: &str, content: &str) -> String {
+    let output = stdai_cmd(home)
         .args(["write", "--kind", kind, "--content", content])
-        .current_dir(dir)
         .output()
         .unwrap();
-    assert!(output.status.success(), "write failed: {}", String::from_utf8_lossy(&output.stderr));
-    String::from_utf8(output.stdout).unwrap().trim().to_string()
+    assert!(
+        output.status.success(),
+        "write failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .unwrap()
+        .trim()
+        .to_string()
 }
 
-pub fn write_artifact_json(dir: &Path, kind: &str, content: &str) -> serde_json::Value {
-    let output = stdai()
+pub fn write_artifact_json(home: &Path, kind: &str, content: &str) -> serde_json::Value {
+    let output = stdai_cmd(home)
         .args(["write", "--kind", kind, "--content", content, "--json"])
-        .current_dir(dir)
         .output()
         .unwrap();
-    assert!(output.status.success(), "write failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "write failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     serde_json::from_slice(&output.stdout).unwrap()
+}
+
+/// Write an artifact under a specific project name.
+pub fn write_artifact_in_project(home: &Path, project: &str, kind: &str, content: &str) -> String {
+    let output = stdai()
+        .env("STDAI_HOME", home)
+        .env("STDAI_PROJECT", project)
+        .args(["write", "--kind", kind, "--content", content])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "write failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .unwrap()
+        .trim()
+        .to_string()
 }
